@@ -1,4 +1,4 @@
-module cloudflare-go-sdk
+module github.com/evenyuglobal/cloudflare-go-sdk
 
 go 1.25.0
 

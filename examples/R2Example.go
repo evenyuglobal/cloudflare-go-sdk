@@ -7,18 +7,18 @@ import (
 	"os"
 	"strings"
 
-	"cloudflare-go-sdk"
+	cfsdk "github.com/evenyuglobal/cloudflare-go-sdk"
 )
 
 func main() {
 	ctx := context.Background()
-	bucketName := "your bucket"
-	objectKey := "your path/file.json"
+	bucketName := "polycop"
+	objectKey := "manage/notices/settings.json"
 
 	// 1. 初始化客户端
 	cfClient, _ := cfsdk.NewClient(ctx,
-		cfsdk.WithCredentials("your appKey", "your secret"),
-		cfsdk.WithAccountID("your accountID"),
+		cfsdk.WithCredentials("ec6a48805c72aa4ede19830a79a9af44", "f04cda4dcbdc3f2b3e96265499d52dd86e2006aa4985a71574fad23d3efee4b8"),
+		cfsdk.WithAccountID("f20cac02d9ee8c99c6e25e6f5f75962e"),
 	)
 
 	// ==========================================

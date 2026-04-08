@@ -1,10 +1,11 @@
 package cfsdk
 
 import (
-	"cloudflare-go-sdk/internal/r2"
 	"context"
 	"fmt"
 	"io"
+
+	"github.com/evenyuglobal/cloudflare-go-sdk/internal/r2"
 )
 
 // Client 顶层接口定义
