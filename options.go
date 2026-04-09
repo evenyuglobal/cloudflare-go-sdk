@@ -7,10 +7,11 @@ import (
 
 // Config 承载初始化 SDK 所需的所有内部配置
 type Config struct {
-	AppKey     string
-	Secret     string
-	AccountID  string
-	HTTPClient *http.Client
+	AppKey       string
+	Secret       string
+	AccountID    string
+	PublicDomain string // 绑定的公开域名
+	HTTPClient   *http.Client
 }
 
 // Option 定义了一个操作 Config 的函数类型
@@ -35,6 +36,13 @@ func WithAccountID(accountID string) Option {
 func WithHTTPClient(client *http.Client) Option {
 	return func(c *Config) {
 		c.HTTPClient = client
+	}
+}
+
+// WithPublicDomain 注入 R2 存储桶的公开访问域名，例如: "assets.yourcompany.com" 或 "pub-xxxx.r2.dev"
+func WithPublicDomain(domain string) Option {
+	return func(c *Config) {
+		c.PublicDomain = domain
 	}
 }
 

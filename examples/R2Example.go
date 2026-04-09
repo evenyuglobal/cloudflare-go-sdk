@@ -2,53 +2,59 @@ package main
 
 import (
 	"context"
-	"io"
+	"fmt"
 	"log"
 	"os"
-	"strings"
+	"time"
 
 	cfsdk "github.com/evenyuglobal/cloudflare-go-sdk"
 )
 
 func main() {
 	ctx := context.Background()
-	bucketName := "polycop"
-	objectKey := "manage/notices/settings.json"
+	appKey := "app-key"
+	secret := "secret-key"
+	accountId := "account-id"
+	bucketName := "bucket"
+	//localFilePath := "/Users/evenyu/Downloads/file_3.jpg"
+	objectKey := "path/file.jpg"
+	publicDomain := "xxxx.com"
 
-	// 1. 初始化客户端
+	// 1. 初始化客户端，带上你的公开域名
 	cfClient, _ := cfsdk.NewClient(ctx,
-		cfsdk.WithCredentials("ec6a48805c72aa4ede19830a79a9af44", "f04cda4dcbdc3f2b3e96265499d52dd86e2006aa4985a71574fad23d3efee4b8"),
-		cfsdk.WithAccountID("f20cac02d9ee8c99c6e25e6f5f75962e"),
+		cfsdk.WithCredentials(appKey, secret),
+		cfsdk.WithAccountID(accountId),
+		cfsdk.WithPublicDomain(publicDomain), // 👈 这里填入你的域名
 	)
+	generatePresignedURL(cfClient, ctx, bucketName, objectKey)
+	//uploadAndGetPublicURL(localFilePath, cfClient, ctx, bucketName, objectKey)
+}
 
-	// ==========================================
-	// 场景 A：下载文件 (Download)
-	// ==========================================
-	reader, err := cfClient.R2().Download(ctx, bucketName, objectKey)
+func uploadAndGetPublicURL(localFilePath string, cfClient cfsdk.Client, ctx context.Context, bucketName string, objectKey string) {
+	// 2. 准备上传文件
+	file, _ := os.Open(localFilePath)
+	defer file.Close()
+
+	// 3. 一键上传并获取永久链接
+	publicURL, err := cfClient.R2().UploadAndGetPublicURL(ctx, bucketName, objectKey, file)
+
 	if err != nil {
-		log.Printf("下载失败: %v", err)
-	} else {
-		// 【极其重要】调用方必须 defer Close 释放网络连接！
-		defer reader.Close()
-
-		// 将云端文件直接流式写入到本地磁盘
-		localFile, _ := os.Create("local_settings.json")
-		defer localFile.Close()
-		io.Copy(localFile, reader)
-
-		log.Println("文件下载并保存成功")
+		log.Fatalf("上传失败: %v", err)
 	}
 
-	// ==========================================
-	// 场景 B：更新文件内容 (Update)
-	// ==========================================
-	newContent := strings.NewReader(`{"status": "updated", "version": 2}`)
+	// 成功！将这个链接存入数据库，或者返回给前端展示
+	fmt.Printf("文件上传成功！永久访问链接为:\n%s\n", publicURL)
+	// 输出: https://assets.my-website.com/images/2026/logo.png
+}
 
-	err = cfClient.R2().Upload(ctx, bucketName, objectKey, newContent)
+func generatePresignedURL(cfClient cfsdk.Client, ctx context.Context, bucketName string, objectKey string) string {
+	// 设置有效期为 15 分钟
+	temporaryURL, err := cfClient.R2().GeneratePresignedURL(ctx, bucketName, objectKey, 15*time.Minute)
+
 	if err != nil {
-		// 如果我们实现了上面的拦截逻辑，当文件不存在时，这里会报错
-		log.Printf("更新失败: %v", err)
-	} else {
-		log.Println("文件内容更新成功 (已覆盖旧版本)")
+		log.Fatalf("生成临时链接失败: %v", err)
 	}
+
+	fmt.Printf("生成的限时链接为 (15分钟内有效):\n%s\n", temporaryURL)
+	return temporaryURL
 }

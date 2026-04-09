@@ -12,11 +12,12 @@ import (
 )
 
 type Provider struct {
-	s3Client *s3.Client
+	s3Client     *s3.Client
+	publicDomain string
 }
 
 // NewProvider 创建底层的 R2 客户端引擎
-func NewProvider(ctx context.Context, appKey, secret, accountID string, httpClient *http.Client) (*Provider, error) {
+func NewProvider(ctx context.Context, appKey, secret, accountID string, publicDomain string, httpClient *http.Client) (*Provider, error) {
 	// 1. 构建 Cloudflare R2 专属的 Endpoint 路由
 	r2Resolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
 		return aws.Endpoint{
@@ -45,8 +46,7 @@ func NewProvider(ctx context.Context, appKey, secret, accountID string, httpClie
 	client := s3.NewFromConfig(cfg)
 
 	return &Provider{
-		s3Client: client,
+		s3Client:     client,
+		publicDomain: publicDomain,
 	}, nil
 }
-
-// Upload 和 Download 方法实现... (同上一条回复)

@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -13,7 +15,7 @@ import (
 
 // Upload 执行纯粹的上传（或覆盖）逻辑
 func (p *Provider) Upload(ctx context.Context, bucket string, key string, content io.Reader) error {
-	_, err := p.s3Client.PutObject(ctx, &s3.PutObjectInput{
+	o, err := p.s3Client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
 		Body:   content,
@@ -22,29 +24,6 @@ func (p *Provider) Upload(ctx context.Context, bucket string, key string, conten
 		return fmt.Errorf("r2 upload failed [%s]: %w", key, err)
 	}
 	return nil
-}
-
-// Update 语义上的更新。如果你的业务要求“必须存在才能更新”，可以先加一个判断逻辑。
-// 如果不需要严格判断，直接调用 Upload 覆盖即可。
-func (p *Provider) Update(ctx context.Context, bucket string, key string, content io.Reader) error {
-	// 进阶做法：如果你想确保文件之前是存在的，才允许更新（防止误创建）
-	// 可以先发起一个 HeadObject 请求验证。如果不需要，直接 return p.Upload(...)
-	_, err := p.s3Client.HeadObject(ctx, &s3.HeadObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(key),
-	})
-	if err != nil {
-		// 判断是否是 404 文件不存在错误
-		var notFound *types.NotFound
-		if errors.As(err, &notFound) {
-			return fmt.Errorf("cannot update: file %s does not exist", key)
-		}
-		// 其他网络或权限错误
-		return fmt.Errorf("failed to check file existence before update: %w", err)
-	}
-
-	// 确认存在后，执行覆盖上传
-	return p.Upload(ctx, bucket, key, content)
 }
 
 // Download 下载文件数据流
@@ -64,4 +43,58 @@ func (p *Provider) Download(ctx context.Context, bucket string, key string) (io.
 
 	// 返回 Body (io.ReadCloser)，将关闭流的责任交接给调用方
 	return output.Body, nil
+}
+
+// GeneratePresignedURL 生成限时下载链接
+func (p *Provider) GeneratePresignedURL(ctx context.Context, bucket string, key string, expireDuration time.Duration) (string, error) {
+	// 1. 初始化预签名客户端 (复用我们已经建好的 S3 Client)
+	presignClient := s3.NewPresignClient(p.s3Client)
+
+	// 2. 生成预签名的 GetObject (获取/下载) 请求
+	req, err := presignClient.PresignGetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	}, s3.WithPresignExpires(expireDuration)) // 注入过期时间
+
+	if err != nil {
+		return "", err
+	}
+
+	// 3. 返回生成的超长安全链接
+	return req.URL, nil
+}
+
+// GetPublicURL 拼接永久链接
+func (p *Provider) GetPublicURL(key string) string {
+	// 去除 key 前面可能多余的 "/"，防止出现 https://domain//key
+	cleanKey := strings.TrimPrefix(key, "/")
+	return fmt.Sprintf("https://%s/%s", p.publicDomain, cleanKey)
+}
+
+// UploadAndGetPublicURL 上传并返回永久链接
+func (p *Provider) UploadAndGetPublicURL(ctx context.Context, bucket string, key string, content io.Reader) (string, error) {
+	if p.publicDomain == "" {
+		return "", errors.New("public domain is not configured in SDK")
+	}
+
+	// 1. 复用之前写好的普通上传逻辑
+	err := p.Upload(ctx, bucket, key, content)
+	if err != nil {
+		return "", err
+	}
+
+	// 2. 上传成功后，返回拼接好的永久 URL
+	return p.GetPublicURL(key), nil
+}
+
+// UploadAndGetURL 上传并返回链接
+func (p *Provider) UploadAndGetURL(ctx context.Context, bucket string, key string, content io.Reader, expireDuration time.Duration) (string, error) {
+	// 1. 复用之前写好的普通上传逻辑
+	err := p.Upload(ctx, bucket, key, content)
+	if err != nil {
+		return "", err
+	}
+
+	// 2. 上传成功后，返回 URL
+	return p.GeneratePresignedURL(ctx, bucket, key, expireDuration)
 }
