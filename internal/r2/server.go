@@ -15,7 +15,7 @@ import (
 
 // Upload 执行纯粹的上传（或覆盖）逻辑
 func (p *Provider) Upload(ctx context.Context, bucket string, key string, content io.Reader) error {
-	o, err := p.s3Client.PutObject(ctx, &s3.PutObjectInput{
+	_, err := p.s3Client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
 		Body:   content,

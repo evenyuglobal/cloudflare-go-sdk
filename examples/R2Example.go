@@ -31,11 +31,11 @@ func main() {
 }
 
 func uploadAndGetPublicURL(localFilePath string, cfClient cfsdk.Client, ctx context.Context, bucketName string, objectKey string) {
-	// 2. 准备上传文件
+	// 1. 准备上传文件
 	file, _ := os.Open(localFilePath)
 	defer file.Close()
 
-	// 3. 一键上传并获取永久链接
+	// 2. 一键上传并获取永久链接
 	publicURL, err := cfClient.R2().UploadAndGetPublicURL(ctx, bucketName, objectKey, file)
 
 	if err != nil {
